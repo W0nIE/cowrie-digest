@@ -39,8 +39,10 @@ data about anyone.
   `ip-9f4a2c81e7b3` (HMAC-SHA256 with a secret key that never leaves the
   server — the same attacker always gets the same pseudonym, so our
   statistics still work).
-- VirusTotal receives **only file hashes** (64 hex characters). Never IPs,
-  never URLs, never log lines.
+- VirusTotal receives **file hashes** (64 hex characters). If a hash is
+  unknown to VirusTotal, the malware sample itself is uploaded for analysis —
+  this is the *attacker's own file* and contains no personal data of ours.
+  Never IPs, never URLs, never log lines.
 - Our notification channel (ntfy) receives **only pseudonymized reports**.
 
 ## 3. Data flow
@@ -104,7 +106,7 @@ flowchart LR
 | Service | What it receives | Contains personal data? |
 |---------|------------------|------------------------|
 | **ntfy.sh** (notifications) | Pseudonymized reports | ❌ No raw IPs |
-| **VirusTotal** | File SHA256 hashes only | ❌ No |
+| **VirusTotal** | File SHA256 hashes; unknown malware samples are uploaded for analysis (attacker's own files) | ❌ No |
 | **Telegram** | Nothing — unused (blocked by our hoster anyway) | ❌ No |
 
 ## 7. The controls (for the curious engineer)
@@ -118,7 +120,7 @@ This isn't just promises — each safeguard is a tracked, tested piece of work:
 | Operator-only access to raw logs | [issue #10](../../issues/10) |
 | This policy + technical compliance docs | [issue #11](../../issues/11) |
 | Roskomnadzor notification (152-ФЗ) | [issue #12](../../issues/12) |
-| VirusTotal = hash-only by design | [issue #3](../../issues/3) |
+| VirusTotal = hash-first, uploads limited to attacker malware samples | [issue #3](../../issues/3) |
 
 ## 8. Questions / requests
 

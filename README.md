@@ -117,4 +117,4 @@ MIT — see [LICENSE](LICENSE).
 
 ## Privacy
 
-This project handles attacker IP addresses (personal data under 152-ФЗ/GDPR). Raw logs never leave the server — outbound reports are pseudonymized, VirusTotal receives file hashes only. See [docs/PII-PROCESSING.md](docs/PII-PROCESSING.md) for the plain-language policy and data-flow diagram.
+This project handles attacker IP addresses (personal data under 152-ФЗ/GDPR). Raw logs never leave the server — outbound reports are pseudonymized, VirusTotal receives file hashes (unknown attacker malware samples are uploaded for analysis, never personal data). See [docs/PII-PROCESSING.md](docs/PII-PROCESSING.md) for the plain-language policy and data-flow diagram.
