@@ -29,6 +29,36 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = SCRIPT_DIR / "config.env"
 STATE_DIR_DEFAULT = SCRIPT_DIR / "state"
+DEFAULT_KEY_PATH = "/opt/cowrie/ops/secrets/pseudo.key"
+
+sys.path.insert(0, str(SCRIPT_DIR))
+from lib.pseudo import Pseudonymizer, load_key  # noqa: E402
+
+
+def pseudo_enabled(cfg: dict) -> bool:
+    return cfg.get("PSEUDO_ENABLED", "true").lower() in ("1", "true", "yes")
+
+
+def get_masker(cfg: dict, required: bool) -> Pseudonymizer | None:
+    """Return the pseudonymizer, or None if disabled.
+
+    required=True (any outbound delivery): a missing/broken key is a hard
+    error — better no message than raw IPs leaving the server.
+    required=False (local --print): fall back to raw with a warning.
+    """
+    if not pseudo_enabled(cfg):
+        return None
+    key_path = Path(cfg.get("PSEUDO_KEY_PATH", DEFAULT_KEY_PATH))
+    try:
+        return Pseudonymizer(load_key(key_path))
+    except (OSError, ValueError) as exc:
+        if required:
+            raise RuntimeError(
+                f"PSEUDO_ENABLED but key unusable ({exc}) — refusing to "
+                f"deliver raw IPs. Run install.sh to generate the key.") from None
+        print(f"warning: pseudonymization unavailable ({exc}), printing raw",
+              file=sys.stderr)
+        return None
 
 
 # ------------------------------------------------------------------ config
@@ -320,11 +350,14 @@ def validate_config(cfg: dict, need_channel: bool):
 
 
 # ------------------------------------------------------------------ modes
-def run_digest(cfg: dict, do_print: bool) -> int:
+def run_digest(cfg: dict, do_print: bool, raw: bool = False) -> int:
     hours = int(cfg["DIGEST_HOURS"])
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
     stats = collect(Path(cfg["COWRIE_LOG"]), since)
     report = build_digest(stats, hours, cfg["SENSOR_NAME"])
+    masker = get_masker(cfg, required=not do_print)
+    if masker and not raw:
+        report = masker.mask(report)
     if do_print:
         print(report)
         return 0
@@ -362,6 +395,9 @@ def run_alerts(cfg: dict) -> int:
     if not successes and not downloads:
         return 0
     text = build_alert_summary(successes, downloads, cfg["SENSOR_NAME"])
+    masker = get_masker(cfg, required=True)
+    if masker:
+        text = masker.mask(text)
     deliver(cfg, text, "Cowrie alert", priority="high")
     print(f"sent 1 consolidated alert ({len(successes)} logins, "
           f"{len(downloads)} downloads)", file=sys.stderr)
@@ -373,15 +409,20 @@ def main() -> int:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--digest", action="store_true", help="send 24h digest")
     g.add_argument("--alerts", action="store_true", help="send instant alerts since last run")
-    g.add_argument("--print", action="store_true", help="print digest, don't send")
+    g.add_argument("--print", action="store_true",
+                   help="print pseudonymized digest, don't send")
+    g.add_argument("--print-raw", action="store_true",
+                   help="print digest with RAW IPs (local debugging only, never sends)")
     ap.add_argument("--config", default=str(CONFIG_PATH), help="path to config.env")
     args = ap.parse_args()
 
     cfg = load_config(Path(args.config))
     try:
-        validate_config(cfg, need_channel=not args.print)
+        validate_config(cfg, need_channel=not (args.print or args.print_raw))
         if args.print:
             return run_digest(cfg, do_print=True)
+        if args.print_raw:
+            return run_digest(cfg, do_print=True, raw=True)
         if args.digest:
             return run_digest(cfg, do_print=False)
         return run_alerts(cfg)

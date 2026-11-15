@@ -7,3 +7,6 @@ __pycache__/
 
 # NEVER commit deployed credentials (issue #7)
 07-auth-realism/userdb.txt
+
+# NEVER commit HMAC keys (issue #8)
+*.key

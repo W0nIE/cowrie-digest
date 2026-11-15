@@ -27,6 +27,27 @@ fi
 echo "==> installing files to ${MODULE_DIR}"
 mkdir -p "${MODULE_DIR}/state" "${MODULE_DIR}/log"
 install -m 0755 "${SRC_DIR}/digest.py" "${MODULE_DIR}/digest.py"
+rm -rf "${MODULE_DIR}/lib"
+cp -r "${SRC_DIR}/lib" "${MODULE_DIR}/lib"
+chmod 0755 "${MODULE_DIR}/lib"
+chmod 0644 "${MODULE_DIR}/lib/"*.py
+
+# --- pseudonymization key (never leaves the server, never in git) -----------
+SECRETS_DIR="/opt/cowrie/ops/secrets"
+if [[ ! -f "${SECRETS_DIR}/pseudo.key" ]]; then
+    mkdir -p "${SECRETS_DIR}"
+    python3 -c "
+import sys; sys.path.insert(0, '${SRC_DIR}')
+from pathlib import Path
+from lib.pseudo import ensure_key
+ensure_key(Path('${SECRETS_DIR}/pseudo.key'))
+"
+    chown root:root "${SECRETS_DIR}/pseudo.key"
+    chmod 0600 "${SECRETS_DIR}/pseudo.key"
+    echo "==> generated HMAC key: ${SECRETS_DIR}/pseudo.key (root:root 0600)"
+else
+    echo "==> keeping existing HMAC key (pseudonyms stay stable)"
+fi
 
 if [[ ! -f "${MODULE_DIR}/config.env" ]]; then
     install -m 0600 "${SRC_DIR}/config.env.example" "${MODULE_DIR}/config.env"
