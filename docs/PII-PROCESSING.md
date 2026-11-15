@@ -128,11 +128,3 @@ This is a personal security-research project. If you believe your data
 appears in our logs and want it checked or removed, open an issue in this
 repository (please **don't** include any personal data in the issue itself).
 
----
-
-> 🇷🇺 **Коротко по-русски:** IP-адреса атакующих — это персональные данные
-> (152-ФЗ). Поэтому сырые логи хранятся только на нашем сервере (доступ —
-> только у оператора, удаление через 60 дней), а наружу уходят лишь
-> обезличенные данные: псевдонимы вида `ip-9f4a2c81e7b3` (HMAC-SHA256, ключ
-> не покидает сервер) и хэши файлов для VirusTotal. Цель обработки —
-> информационная безопасность и исследование угроз (legitimate interest).
