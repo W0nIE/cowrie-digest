@@ -7,6 +7,10 @@ SSH/Telnet honeypots. Zero dependencies (Python 3 stdlib only), delivers via
 Part of the `honeypot-ops` module family — self-contained: install, test,
 uninstall without touching anything else on the system.
 
+> 🍯 **New here?** [docs/HONEYPOT-GUIDE.md](docs/HONEYPOT-GUIDE.md) — a
+> beginner-friendly, step-by-step guide from a fresh VPS to a working
+> honeypot with phone alerts (mermaid diagrams, every trap pre-marked).
+
 ## What you get
 
 - **Daily digest** (cron, 09:00) — connections, unique attacker IPs, failed/successful
