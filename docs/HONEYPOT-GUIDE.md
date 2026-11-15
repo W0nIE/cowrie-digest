@@ -63,7 +63,8 @@ flowchart TD
     E --> F["5️⃣ Install Cowrie<br/>on port 22"]
     F --> G["6️⃣ Attack yourself<br/>see fake server"]
     G --> H["7️⃣ Install digest<br/>phone beeps 📱"]
-    H --> I["🎉 Watch hackers<br/>every morning"]
+    H --> J["8️⃣ Attackers get masks<br/>IPs stay home 🎭"]
+    J --> I["🎉 Watch hackers<br/>every morning"]
 
     style D fill:#ffebee,stroke:#c62828
     style I fill:#e8f5e9,stroke:#2e7d32
@@ -372,6 +373,61 @@ instant alerts every 5 minutes.** You never have to look at a log again
 
 ---
 
+## 8️⃣ Attackers wear masks 🎭
+
+**Why:** an IP address counts as personal data (GDPR & friends — yes, even
+an attacker's). Your phone reports travel through ntfy, a third-party
+service. So we follow one golden rule: **raw IPs never leave the server.**
+They leave only wearing a mask.
+
+Good news: you already did this step. When you ran `install.sh`, it quietly
+created a secret key:
+
+```
+/opt/cowrie/ops/secrets/pseudo.key    # root:root 0600, never in git
+```
+
+Every report since then replaces each attacker IP with a **pseudonym**:
+
+```
+58x  109.160.32.136   →   58x  ip-9f4a2c81e7b3
+```
+
+Here's the clever part — the mask is made by `HMAC-SHA256` with your
+secret key:
+
+- **Same attacker, same mask** — every day, every report. Your
+  "top attackers" table stays meaningful; you can watch a regular visitor
+  for months without ever knowing their real IP.
+- **Nobody can peel the mask off** — not ntfy, not someone reading your
+  old reports, not even by trying all 4 billion IPs (the secret key is
+  mixed in; without it, brute force hits a wall). And the key lives only
+  on your server.
+- **No key, no report** — if the key is ever missing or broken, the module
+  *refuses to send* rather than leak raw IPs. Paranoid by design.
+
+✅ **See the masks yourself:**
+
+```bash
+/opt/cowrie/ops/01-digest/digest.py --print        # masked — safe to share
+/opt/cowrie/ops/01-digest/digest.py --print-raw    # RAW — local eyes only!
+```
+
+> **Q: An attacker keeps hammering me. How do I find their REAL IP?**
+> **A:** On the server — and only there. `cowrie.json` always has the raw
+> data, and [docs/PSEUDONYMIZATION.md](PSEUDONYMIZATION.md) has a
+> copy-paste "reverse lookup" script: give it a pseudonym, it finds the
+> real IP in your logs. The mask is one-way only for the *outside world*,
+> never for you.
+>
+> **Q: Can I ever change the masks?**
+> **A:** Sure — delete `pseudo.key` and re-run `install.sh`; every attacker
+> gets a brand-new mask. Old reports stop matching new ones. Sometimes
+> that's exactly what you want (privacy nerds call it "breaking
+> linkability"; we call it "everyone gets a fresh disguise").
+
+---
+
 ## 🎉 Done. You built a honeypot.
 
 **Why:** a 10-second recap of what you own now — screenshot it for future you.
@@ -380,6 +436,7 @@ Let's take stock. You now have:
 
 - 🔐 A server only **you** can enter (key-only, secret port, firewall, fail2ban)
 - 🍯 A fake server on port 22, catching real attackers 24/7
+- 🎭 Reports where every attacker wears a mask — raw IPs never leave your server
 - 📱 Morning reports and instant alerts on your phone
 - 🍿 A front-row seat to the internet's wild side
 
