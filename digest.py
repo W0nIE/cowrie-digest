@@ -51,11 +51,24 @@ def load_config(path: Path) -> dict:
 
 
 # ------------------------------------------------------------------ parsing
-def iter_events(log_path: Path, since: datetime):
-    """Yield (event_dict) parsed from JSON-lines cowrie log, newer than `since`."""
+def iter_events(log_path: Path, since: datetime, tail_bytes: int | None = None):
+    """Yield event dicts parsed from JSON-lines cowrie log, newer than `since`.
+
+    If `tail_bytes` is set and the file is larger, only the last `tail_bytes`
+    are scanned (first partial line is skipped). This bounds CPU/IO when
+    cowrie.json has grown large — alerts run every 5 minutes.
+    """
     if not log_path.exists():
         return
     with log_path.open("r", encoding="utf-8", errors="replace") as fh:
+        if tail_bytes is not None:
+            fh.seek(0, 2)
+            size = fh.tell()
+            if size > tail_bytes:
+                fh.seek(size - tail_bytes)
+                fh.readline()  # discard partial line
+            else:
+                fh.seek(0)
         for line in fh:
             line = line.strip()
             if not line or not line.startswith("{"):
@@ -169,6 +182,7 @@ def build_digest(stats: dict, hours: int, sensor: str) -> str:
 
 
 def build_alert(ev: dict, sensor: str) -> str | None:
+    """Single-event alert text (kept for --alerts dry debugging)."""
     eid = ev.get("eventid")
     src = ev.get("src_ip", "?")
     if eid == "cowrie.login.success":
@@ -178,6 +192,34 @@ def build_alert(ev: dict, sensor: str) -> str | None:
         return (f"🦠 [{sensor}] Malware download by {src}: "
                 f"{ev.get('url', '?')} (sha256: {str(ev.get('shasum', '?'))[:12]}…)")
     return None
+
+
+def build_alert_summary(successes: list, downloads: list, sensor: str,
+                        sample_limit: int = 5) -> str:
+    """One consolidated alert per run — NOT one message per event.
+
+    With a permissive userdb every bot login "succeeds", so per-event alerts
+    would flood the channel (self-inflicted DoS). Aggregate instead.
+    """
+    parts = [f"🚨 [{sensor}] Honeypot alert"]
+    if successes:
+        parts.append(f"\n✅ Successful logins: {len(successes)}")
+        creds = Counter(f"{ip} → {u}/{p}" for ip, u, p in successes)
+        for label, count in creds.most_common(sample_limit):
+            parts.append(f"  {count}x  {label}")
+        remaining = len(creds) - sample_limit
+        if remaining > 0:
+            parts.append(f"  …and {remaining} more credential pairs")
+    if downloads:
+        parts.append(f"\n🦠 Malware downloads: {len(downloads)}")
+        for ip, url, shasum in downloads[:sample_limit]:
+            parts.append(f"  {ip}: {url}")
+            if shasum:
+                parts.append(f"    sha256: {shasum}")
+        remaining = len(downloads) - sample_limit
+        if remaining > 0:
+            parts.append(f"  …and {remaining} more files")
+    return "\n".join(parts)
 
 
 # ------------------------------------------------------------------ delivery
@@ -192,9 +234,15 @@ def send_ntfy(cfg: dict, text: str, title: str, priority: str = "default"):
         headers={"Title": title, "Priority": priority},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        if resp.status >= 400:
-            raise RuntimeError(f"ntfy returned HTTP {resp.status}")
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            if resp.status >= 400:
+                raise RuntimeError(f"ntfy returned HTTP {resp.status}")
+    except urllib.error.HTTPError as exc:
+        # Sanitized: HTTPError str() embeds the full URL (ntfy topic = secret)
+        raise RuntimeError(f"ntfy delivery failed (HTTP {exc.code})") from None
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"ntfy delivery failed ({exc.reason})") from None
 
 
 def send_telegram(cfg: dict, text: str):
@@ -208,10 +256,18 @@ def send_telegram(cfg: dict, text: str):
         "text": text,
         "disable_web_page_preview": "true",
     }).encode()
-    with urllib.request.urlopen(url, data=payload, timeout=20) as resp:
-        body = json.loads(resp.read())
-        if not body.get("ok"):
-            raise RuntimeError(f"Telegram API error: {body}")
+    try:
+        with urllib.request.urlopen(url, data=payload, timeout=20) as resp:
+            body = json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        # Sanitized: the request URL contains the bot token — never leak it
+        # into exception text (it would land in cron logs).
+        raise RuntimeError(f"Telegram delivery failed (HTTP {exc.code})") from None
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Telegram delivery failed ({exc.reason})") from None
+    if not body.get("ok"):
+        desc = body.get("description", "unknown error")
+        raise RuntimeError(f"Telegram API error: {desc}")
 
 
 def deliver(cfg: dict, text: str, title: str, priority: str = "default"):
@@ -242,6 +298,27 @@ def write_ts(path: Path, ts: datetime):
     path.write_text(ts.isoformat())
 
 
+def validate_config(cfg: dict, need_channel: bool):
+    """Fail fast with clear messages instead of cryptic errors mid-run."""
+    try:
+        if int(cfg["DIGEST_HOURS"]) <= 0:
+            raise ValueError
+    except ValueError:
+        raise RuntimeError("DIGEST_HOURS must be a positive integer") from None
+    if not need_channel:
+        return
+    channel = cfg.get("CHANNEL", "ntfy").lower()
+    if channel not in ("ntfy", "telegram"):
+        raise RuntimeError(f"Unknown CHANNEL '{channel}' (use 'ntfy' or 'telegram')")
+    if channel == "ntfy" and not cfg.get("NTFY_TOPIC"):
+        raise RuntimeError("CHANNEL=ntfy but NTFY_TOPIC is not set in config.env")
+    if channel == "telegram" and (
+        not cfg.get("TELEGRAM_BOT_TOKEN") or not cfg.get("TELEGRAM_CHAT_ID")
+    ):
+        raise RuntimeError(
+            "CHANNEL=telegram but TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set")
+
+
 # ------------------------------------------------------------------ modes
 def run_digest(cfg: dict, do_print: bool) -> int:
     hours = int(cfg["DIGEST_HOURS"])
@@ -260,22 +337,34 @@ def run_digest(cfg: dict, do_print: bool) -> int:
     return 0
 
 
+ALERT_TAIL_BYTES = 10 * 1024 * 1024  # alerts: scan at most the last 10 MB
+
+
 def run_alerts(cfg: dict) -> int:
     now = datetime.now(timezone.utc)
     marker = state_file(cfg, "last_alert.ts")
     since = read_ts(marker, now - timedelta(minutes=10))
-    sent = 0
+    successes = []   # (src_ip, username, password)
+    downloads = []   # (src_ip, url, shasum)
     latest = since
-    for ev in iter_events(Path(cfg["COWRIE_LOG"]), since):
-        text = build_alert(ev, cfg["SENSOR_NAME"])
-        if text:
-            deliver(cfg, text, "Cowrie alert", priority="high")
-            sent += 1
+    for ev in iter_events(Path(cfg["COWRIE_LOG"]), since,
+                          tail_bytes=ALERT_TAIL_BYTES):
+        eid = ev.get("eventid")
+        if eid == "cowrie.login.success":
+            successes.append((ev.get("src_ip", "?"),
+                              ev.get("username", ""), ev.get("password", "")))
+        elif eid == "cowrie.session.file_download":
+            downloads.append((ev.get("src_ip", "?"), ev.get("url", "?"),
+                              ev.get("shasum", "")))
         if ev["_ts"] > latest:
             latest = ev["_ts"]
     write_ts(marker, max(latest, now))
-    if sent:
-        print(f"sent {sent} alert(s)", file=sys.stderr)
+    if not successes and not downloads:
+        return 0
+    text = build_alert_summary(successes, downloads, cfg["SENSOR_NAME"])
+    deliver(cfg, text, "Cowrie alert", priority="high")
+    print(f"sent 1 consolidated alert ({len(successes)} logins, "
+          f"{len(downloads)} downloads)", file=sys.stderr)
     return 0
 
 
@@ -290,6 +379,7 @@ def main() -> int:
 
     cfg = load_config(Path(args.config))
     try:
+        validate_config(cfg, need_channel=not args.print)
         if args.print:
             return run_digest(cfg, do_print=True)
         if args.digest:

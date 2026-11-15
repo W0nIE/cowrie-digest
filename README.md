@@ -12,9 +12,13 @@ uninstall without touching anything else on the system.
 - **Daily digest** (cron, 09:00) — connections, unique attacker IPs, failed/successful
   logins, top credentials tried, top commands executed, malware download URLs,
   and the list of IPs that got a shell.
-- **Instant alerts** (cron, every 5 min) — fires on:
-  - `cowrie.login.success` — someone got into the fake shell
-  - `cowrie.session.file_download` — malware captured (with SHA256)
+- **Instant alerts** (cron, every 5 min) — one **consolidated** message per run
+  covering new events, so a bot storm can't flood your phone:
+  - `cowrie.login.success` — someone got into the fake shell (count + top creds/IPs)
+  - `cowrie.session.file_download` — malware captured (URL + SHA256)
+
+  Alert runs scan at most the last 10 MB of the log, so a multi-GB
+  `cowrie.json` never slows the 5-minute cron down.
 
 Example digest:
 
