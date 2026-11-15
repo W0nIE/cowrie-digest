@@ -1,186 +1,131 @@
-# 🍯 Build Your Own Honeypot Server — Step by Step
+# 🍯 Your Own Honeypot Server — Caveman Guide
 
-> **Who this guide is for:** you have a fresh VPS and want to watch real
-> hackers attack a fake server — and get a nice report on your phone every
-> morning. No deep Linux knowledge needed: every command is copy-paste,
-> every step has a "✅ you should see" checkpoint, and every trap we fell
-> into is marked so you won't.
-
-**Time:** ~1 hour. **Cost:** any cheap VPS (~$3–5/mo). **Result:**
+> Fake server. Real hackers attack it. You watch. Phone beeps every morning.
+> Copy. Paste. Done. ~1 hour.
 
 ```mermaid
 flowchart LR
-    subgraph Internet["🌍 Internet"]
-        H["👾 Attackers<br/>(real bots & hackers)"]
-    end
-
-    subgraph VPS["🖥️ Your VPS"]
-        direction TB
-        C["🍯 Cowrie honeypot<br/>port 22 — FAKE server<br/>(Podman container)"]
-        S["🔐 Real SSH<br/>port 52722 — only YOU"]
-        L[("cowrie.json<br/>attack log")]
-        D["digest.py"]
-        C -->|writes| L
-        L -->|reads| D
-    end
-
-    subgraph Phone["📱 Your phone"]
-        N["ntfy app<br/>daily report + alerts"]
-    end
-
-    H -->|"attack port 22<br/>(they think it's real)"| C
-    You["🧑 You"] -->|"manage, port 52722"| S
-    D -->|"09:00 digest<br/>+ instant alerts"| N
+    H["👾 Hackers"] -->|"see port 22<br/>attack it"| C["🍯 Cowrie<br/>FAKE server"]
+    You["🧑 You"] -->|"secret port<br/>only you know"| S["🔐 real SSH"]
+    C --> L[("attack log")]
+    L --> D["digest.py"]
+    D -->|"09:00 report<br/>+ alerts"| P["📱 your phone"]
 
     style C fill:#fff8e1,stroke:#f9a825
     style S fill:#e8f5e9,stroke:#2e7d32
-    style N fill:#e3f2fd,stroke:#1565c0
 ```
 
-**The trick:** attackers scan the internet for open SSH on port 22. Your
-*real* SSH hides on port 52722 (only you know it). Port 22 belongs to a
-fake server that looks real, logs everything, and lets attackers "in" —
-while you watch from a safe distance.
+**The trick:** hackers scan port 22. Your real SSH hides elsewhere.
+Port 22 = trap. Trap logs everything.
 
----
+## The plan
 
-## Step 0 — What you need
+```mermaid
+flowchart TD
+    A["0️⃣ Buy VPS<br/>get IP + root password"] --> B["1️⃣ Login<br/>update system"]
+    B --> C["2️⃣ Make user<br/>make SSH key"]
+    C --> D["3️⃣ Move SSH<br/>to secret port"]
+    D --> E["4️⃣ Firewall<br/>+ fail2ban"]
+    E --> F["5️⃣ Install Cowrie<br/>on port 22"]
+    F --> G["6️⃣ Attack yourself<br/>see fake server"]
+    G --> H["7️⃣ Install digest<br/>phone beeps 📱"]
+    H --> I["🎉 Watch hackers<br/>every morning"]
 
-| Thing | Example | Notes |
+    style D fill:#ffebee,stroke:#c62828
+    style I fill:#e8f5e9,stroke:#2e7d32
+```
+
+**Before you start — pick two numbers, write them down:**
+
+| Your thing | This guide uses | You use |
 |---|---|---|
-| A VPS with Debian 12/13 or Ubuntu | any provider | fresh install, root password from provider panel |
-| Server IP address | `203.0.113.10` | from provider panel |
-| 10 minutes of focus per step | ☕ | — |
+| Server IP | `203.0.113.10` | ← your real IP |
+| Secret SSH port | `51234` | ← yours, 10000–60000 |
 
-Below, replace `203.0.113.10` with **your** server IP everywhere.
+⚠️ Never publish your real port. Replace everywhere.
 
 ---
 
-## Step 1 — First login & update
+## 1️⃣ Login. Update.
 
-From your computer's terminal (macOS/Linux) or PowerShell (Windows 10+):
+On your computer:
 
 ```bash
-ssh root@203.0.113.10        # enter the root password from your provider
+ssh root@203.0.113.10          # password from your VPS provider
 ```
 
-Inside the server, update everything:
+On the server:
 
 ```bash
 apt update && apt upgrade -y
+apt install -y unattended-upgrades sudo
 ```
 
-> ⚠️ **If the upgrade fails with a `grub-pc` error** (common on RUVDS and
-> some other images), run this once and retry:
+> 🪤 Upgrade fails with `grub-pc` error? Run this, retry:
 > ```bash
 > DISK=$(findmnt -n -o SOURCE / | sed 's/[0-9]*$//')
 > echo "grub-pc grub-pc/install_devices multiselect $DISK" | debconf-set-selections
 > dpkg --configure grub-pc && apt upgrade -y
 > ```
 
-Turn on automatic security updates so the server patches itself:
-
-```bash
-apt install -y unattended-upgrades
-cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
-APT::Periodic::Update-Package-Lists "1";
-APT::Periodic::Unattended-Upgrade "1";
-APT::Periodic::AutocleanInterval "7";
-EOF
-```
-
 ---
 
-## Step 2 — Your own user + SSH key 🔑
+## 2️⃣ User. Key. 🔑
 
-Passwords get brute-forced; keys don't. We'll create a key **on your
-computer** (not the server):
+Key = unbreakable password. Make key **on your computer**:
 
 ```bash
-# run on YOUR computer, not the server
-ssh-keygen -t ed25519 -f ~/.ssh/honeypot_server   # set a passphrase
-cat ~/.ssh/honeypot_server.pub                     # copy the printed line
+ssh-keygen -t ed25519 -f ~/.ssh/honeypot
+cat ~/.ssh/honeypot.pub        # copy the line
 ```
 
-Back **on the server** (still as root), create your user — replace `alex`
-with your nickname and paste your public key:
+On the **server** (pick your username instead of `alex`, paste your key):
 
 ```bash
-apt install -y sudo                          # some minimal images lack it!
-useradd -m -s /bin/bash alex
-usermod -aG sudo alex
-echo 'alex ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/alex
-chmod 440 /etc/sudoers.d/alex
-
+useradd -m -s /bin/bash alex && usermod -aG sudo alex
+echo 'alex ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/alex && chmod 440 /etc/sudoers.d/alex
 mkdir -p /home/alex/.ssh
-echo 'PASTE-YOUR-PUBLIC-KEY-HERE' > /home/alex/.ssh/authorized_keys
-chmod 700 /home/alex/.ssh
-chmod 600 /home/alex/.ssh/authorized_keys
+echo 'PASTE-KEY-HERE' > /home/alex/.ssh/authorized_keys
+chmod 700 /home/alex/.ssh && chmod 600 /home/alex/.ssh/authorized_keys
 chown -R alex:alex /home/alex/.ssh
 ```
 
-> Why `NOPASSWD` for sudo? In the next step we disable password login
-> completely — after that sudo has no password to ask for. The key is your
-> identity now.
-
-✅ **Checkpoint** — open a **new** terminal tab (keep the old one open!):
+✅ **Test** — new tab, old tab stays open:
 
 ```bash
-ssh -i ~/.ssh/honeypot_server alex@203.0.113.10 'sudo whoami'
-# must print: root
+ssh -i ~/.ssh/honeypot alex@203.0.113.10 'sudo whoami'   # must say: root
 ```
 
-Only continue when this works.
+Works? Go on. Fails? Fix now, do not continue.
 
 ---
 
-## Step 3 — Move SSH to a secret port
+## 3️⃣ Move SSH to secret port
 
-This is the heart of the trick. We move your real SSH from port 22 to
-**52722** (pick your own number 10000–60000), so port 22 becomes free for
-the honeypot.
-
-```mermaid
-flowchart TD
-    A["SSH listens on<br/>22 + 52722 (both)"] --> B["✅ Test login on 52722<br/>in a NEW tab"]
-    B -->|works| C["Switch to 52722 only"]
-    B -->|fails| F["🛑 STOP — fix keys first.<br/>Your old session still works."]
-    C --> D["✅ Old port 22 → refused<br/>✅ password login → refused<br/>✅ key on 52722 → works"]
-    D --> E["Port 22 is FREE<br/>→ honeypot time 🍯"]
-
-    style F fill:#ffebee,stroke:#c62828
-    style E fill:#fff8e1,stroke:#f9a825
-```
-
-**The golden rule of this step:** never close your working session until
-the new one is proven. We follow this order strictly.
-
-**3a.** Check how SSH is started (Debian 13 uses socket activation):
+**Golden rule: never close working session until new one works.**
 
 ```bash
-systemctl is-active ssh.socket ssh.service
+systemctl is-active ssh.socket ssh.service    # remember which says "active"
 ```
 
-**3b.** Create the config — we keep **both ports** for now.
-
-If `ssh.socket` said **active**:
+**If `ssh.socket` active** (Debian 13):
 
 ```bash
 systemctl edit ssh.socket
-# paste between the comment markers:
+# paste between the markers:
 #   [Socket]
 #   ListenStream=
 #   ListenStream=22
-#   ListenStream=52722
+#   ListenStream=51234
 systemctl restart ssh.socket
 ```
 
-If `ssh.service` said **active**:
+**If `ssh.service` active:**
 
 ```bash
 cat > /etc/ssh/sshd_config.d/00-hardening.conf <<'EOF'
 Port 22
-Port 52722
+Port 51234
 PermitRootLogin no
 PasswordAuthentication no
 PubkeyAuthentication yes
@@ -188,109 +133,66 @@ EOF
 sshd -t && systemctl restart ssh
 ```
 
-**3c.** ✅ **Checkpoint** — in a **new** tab:
+Both ports open now. ✅ **Test new one — new tab:**
 
 ```bash
-ssh -p 52722 -i ~/.ssh/honeypot_server alex@203.0.113.10 'echo NEW PORT WORKS'
+ssh -p 51234 -i ~/.ssh/honeypot alex@203.0.113.10 'echo WORKS'
 ```
 
-**3d.** Only if that printed `NEW PORT WORKS` — drop port 22 (edit the
-same file/socket drop-in, remove the `22` line, restart again) and verify
-the lockout is correct:
+Says `WORKS`? Remove the `22` line (same file), restart again. Verify:
 
 ```bash
-# from your computer:
-ssh     root@203.0.113.10                         # → Connection refused ✅
-ssh -p 52722 root@203.0.113.10                    # → Permission denied ✅
-ssh -p 52722 -i ~/.ssh/honeypot_server alex@203.0.113.10  # → works ✅
+ssh root@203.0.113.10                                    # refused ✅
+ssh -p 51234 root@203.0.113.10                           # denied ✅
+ssh -p 51234 -i ~/.ssh/honeypot alex@203.0.113.10        # works ✅
 ```
 
-📌 **Write down your new connection string. The key file
-`~/.ssh/honeypot_server` is now the ONLY way in. Back it up.**
+📌 **Key file = only way in now. Back it up.**
 
 ---
 
-## Step 4 — Firewall + fail2ban 🧱
+## 4️⃣ Firewall. fail2ban. 🧱
 
 ```bash
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 52722/tcp comment 'real SSH'
-ufw allow 22/tcp comment 'honeypot (soon)'
+ufw default deny incoming && ufw default allow outgoing
+ufw allow 51234/tcp comment 'real SSH'
+ufw allow 22/tcp comment 'honeypot'
 ufw --force enable
 ```
 
-> ⚠️ The order matters: allow your SSH port **before** enabling, or you
-> lock yourself out.
-
-fail2ban bans IPs that keep failing passwords on your *real* SSH:
+⚠️ Allow your SSH port **before** `enable`. Wrong order = locked out.
 
 ```bash
 apt install -y fail2ban
 cat > /etc/fail2ban/jail.local <<'EOF'
 [sshd]
 enabled = true
-port = 52722
+port = 51234
 backend = systemd
 EOF
-systemctl restart fail2ban
-fail2ban-client status sshd        # ✅ must show the jail, not an error
+systemctl restart fail2ban && fail2ban-client status sshd
 ```
 
 ---
 
-## Step 5 — The honeypot 🍯 (Cowrie in Podman)
-
-We run Cowrie in **Podman** (a safer Docker alternative: daemonless,
-drops fewer privileges) with **systemd** keeping it alive across reboots.
-
-**5a.** Install Podman and prepare folders:
+## 5️⃣ Honeypot time 🍯
 
 ```bash
 apt install -y podman fuse-overlayfs slirp4netns
 
-mkdir -p /opt/cowrie/etc /opt/cowrie/data
-mkdir -p /opt/cowrie/var/lib/cowrie/downloads /opt/cowrie/var/lib/cowrie/tty /opt/cowrie/var/log/cowrie
+# folders FIRST, owner 999 — or Cowrie crashes (trap!)
+mkdir -p /opt/cowrie/etc /opt/cowrie/var/lib/cowrie/downloads \
+         /opt/cowrie/var/lib/cowrie/tty /opt/cowrie/var/log/cowrie
 chown -R 999:999 /opt/cowrie/var
-```
 
-> 🪤 **Trap we hit:** Cowrie inside the container runs as **UID 999**, and
-> an empty/mis-owned volume makes it crash with
-> `FileNotFoundError: var/lib/cowrie/ssh_host_rsa_key.pub`. The two lines
-> above prevent both.
+# fake server name
+printf '[honeypot]\nhostname = srv04\n\n[ssh]\nenabled = true\n\n[telnet]\nenabled = false\n' \
+  > /opt/cowrie/etc/cowrie.cfg
 
-**5b.** Minimal config — the fake server's name is `srv04` (pick your own
-believable name):
+# passwords the trap accepts (* = any) — without this, zero catches (trap!)
+printf 'root:x:*\nadmin:x:*\n' > /opt/cowrie/etc/userdb.txt
 
-```bash
-cat > /opt/cowrie/etc/cowrie.cfg <<'EOF'
-[honeypot]
-hostname = srv04
-
-[ssh]
-enabled = true
-
-[telnet]
-enabled = false
-EOF
-```
-
-**5c.** Passwords the honeypot accepts — `*` means "any password works"
-(fine to start; see *Going further* for the realistic-auth upgrade):
-
-```bash
-cat > /opt/cowrie/etc/userdb.txt <<'EOF'
-root:x:*
-admin:x:*
-EOF
-```
-
-> 🪤 **Trap:** the official image ships **no** userdb — without this file
-> every login fails and your honeypot catches nothing.
-
-**5d.** The quadlet — systemd runs the container for us:
-
-```bash
+# autostart via systemd
 cat > /etc/containers/systemd/cowrie.container <<'EOF'
 [Unit]
 Description=Cowrie SSH Honeypot
@@ -310,129 +212,82 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl start cowrie.service
-sleep 20                                 # first image pull takes a moment
-podman logs cowrie 2>&1 | tail -3
+systemctl daemon-reload && systemctl start cowrie.service
+sleep 20
+podman logs cowrie 2>&1 | tail -3     # ✅ must say: Ready to accept SSH connections
 ```
 
-✅ **Checkpoint:** the log must say `Ready to accept SSH connections`.
-
-**5e.** One firewall fix (this one cost us an evening):
+One firewall fix (this trap cost us an evening):
 
 ```bash
 ufw route allow proto tcp from any to 10.88.0.0/16 port 2222
 systemctl restart cowrie.service
 ```
 
-> 🪤 **Trap:** UFW's default policy silently drops traffic *forwarded* to
-> containers (it arrives at the container port 2222, not 22). The `route
-> allow` rule fixes it. And because touching UFW reloads firewall rules,
-> restart the container right after.
+## 6️⃣ Attack yourself 🎣
 
-**5f.** ✅ **Attack yourself** (the fun part) — from your computer:
+From your computer:
 
 ```bash
-ssh -o StrictHostKeyChecking=no root@203.0.113.10   # password: anything
-whoami && hostname
+ssh -o StrictHostKeyChecking=no root@203.0.113.10    # any password
+whoami && hostname                                    # says: srv04 🤡
 ```
 
-You should "log in" and see `srv04` — but it's the fake. Meanwhile the
-real server logged everything. 🎣
-
-Within minutes of opening port 22, real bots from the internet will find
-you. Their attacks land in `/opt/cowrie/var/log/cowrie/cowrie.json`.
+Fake! But hackers believe it. Real bots find you within minutes.
+Their attacks: `/opt/cowrie/var/log/cowrie/cowrie.json`.
 
 ---
 
-## Step 6 — Reports to your phone 📱 (this repo)
-
-Now install the digest module — it's this repository:
+## 7️⃣ Phone beeps 📱
 
 ```bash
 apt install -y git
-git clone https://github.com/W0nIE/cowrie-digest.git
-cd cowrie-digest
-./install.sh                       # run as root (sudo -i first)
+git clone https://github.com/W0nIE/cowrie-digest.git && cd cowrie-digest
+./install.sh
 ```
 
-Get notified via **ntfy** (free, no account, 2 minutes):
+Get **ntfy** app on phone (free, no account). Add subscription:
+invent long secret topic like `cowrie-alerts-x7k9qm2vdp4w`, server `https://ntfy.sh`.
 
-1. Install the **ntfy** app on your phone (Android / iOS).
-2. Invent a long secret topic name, e.g. `cowrie-alerts-x7k9qm2vdp4w`.
-3. In the app: **Add subscription →** that topic, server `https://ntfy.sh`.
-4. On the server:
+On the server:
 
 ```bash
 nano /opt/cowrie/ops/01-digest/config.env
-# set:
-#   CHANNEL=ntfy
-#   NTFY_TOPIC=cowrie-alerts-x7k9qm2vdp4w   ← your topic
-#   SENSOR_NAME=srv04
+# CHANNEL=ntfy
+# NTFY_TOPIC=<your secret topic>
+# SENSOR_NAME=srv04
 
-/opt/cowrie/ops/01-digest/digest.py --digest    # ✅ test: push arrives in seconds
+/opt/cowrie/ops/01-digest/digest.py --digest    # ✅ phone beeps in seconds
 ```
 
-Done — cron is already installed:
-
-```mermaid
-flowchart LR
-    subgraph cron["⏰ cron (automatic)"]
-        D1["09:00 daily<br/>digest.py --digest"]
-        D2["every 5 min<br/>digest.py --alerts"]
-    end
-    L[("cowrie.json")]
-    P["📱 your phone"]
-
-    L --> D1
-    L --> D2
-    D1 -->|"🍯 312 connections,<br/>47 IPs, 6 shells..."| P
-    D2 -->|"🚨 someone got in /<br/>malware captured"| P
-
-    style P fill:#e3f2fd,stroke:#1565c0
-```
-
-Other channels (Telegram) and all settings: [docs/CONFIGURATION.md](CONFIGURATION.md).
+Cron is automatic now: **report 09:00 daily, alerts every 5 min.**
 
 ---
 
-## Troubleshooting (real traps, real fixes)
+## Broke? Trap table 🪤
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| Container crashes: `ssh_host_rsa_key.pub` not found | empty host volume masked the image's `var/` | create the `var/...` dirs from step 5a **before** starting |
-| `PermissionError` in cowrie logs | host dirs owned by root | `chown -R 999:999 /opt/cowrie/var` |
-| Every login fails, zero events | missing `userdb.txt` | step 5c, then `systemctl restart cowrie.service` |
-| Self-attack: connection times out | UFW drops forwarded container traffic | the `ufw route allow ... 2222` rule from step 5e |
-| Honeypot died after editing UFW | UFW reload wipes container firewall jumps | `systemctl restart cowrie.service` after any `ufw` change |
-| `Permission denied` on port 52722 | wrong key / user | use `-i ~/.ssh/honeypot_server` and your username, not root |
-| `Port` in sshd_config ignored | Debian 13 socket activation | set the port via `systemctl edit ssh.socket` (step 3b) |
-| Need to peek inside the container | image has no `cat`/`grep`/`sh` | `podman exec cowrie python3 -c "print(open('/etc/hostname').read())"` |
+| Problem | Fix |
+|---|---|
+| Cowrie crashes: `ssh_host_rsa_key.pub` missing | you skipped the folders in step 5 — make them, `chown 999:999` |
+| `PermissionError` in cowrie logs | `chown -R 999:999 /opt/cowrie/var` |
+| Zero logins in log, ever | `userdb.txt` missing → step 5, restart container |
+| Self-attack times out | the `ufw route allow ... 2222` line → step 5 |
+| Died after any `ufw` change | `systemctl restart cowrie.service` (ufw reload breaks it) |
+| `Port` config ignored | Debian 13: port lives in `systemctl edit ssh.socket`, not sshd_config |
+| `Permission denied` on secret port | wrong key or user — `-i ~/.ssh/honeypot`, your username, not root |
 
----
+## Want more? 🚀
 
-## Going further (optional levels)
+- **Smarter bait:** believable passwords instead of "any" → [07-auth-realism](../07-auth-realism/README.md)
+- **Privacy:** attacker IPs = personal data; reports already pseudonymize them → [docs/PII-PROCESSING.md](PII-PROCESSING.md)
+- **Alerts deep-dive:** [docs/CONFIGURATION.md](CONFIGURATION.md)
 
-You have a working, reporting honeypot. When you're ready for upgrades:
+## Rules ⚠️
 
-1. **Realistic auth** — replace wildcard passwords with believable weak
-   ones so you catch targeted attackers, not just botnet noise:
-   [07-auth-realism](../07-auth-realism/README.md).
-2. **Deception filesystem** — make the fake server look like a real lived-in
-   web server (fake WordPress, bash history, backups). Advanced; ask in
-   issues.
-3. **Privacy** — attacker IPs are personal data under GDPR/152-ФЗ. This
-   repo already pseudonymizes them in reports; read the plain-language
-   policy: [docs/PII-PROCESSING.md](PII-PROCESSING.md).
-
-## Safety notes ⚠️
-
-- A honeypot is a **deliberately attacked** machine. Give it its own VPS;
-  don't host anything you care about next to it.
-- Never reuse the honeypot's bait passwords anywhere real.
-- The key to port 52722 is the only way in — back it up like a passport.
+- Honeypot = attacked machine. Own VPS. Nothing valuable next to it.
+- Trap passwords ≠ your real passwords. Ever.
+- Key to the secret port — guard it like a passport.
 
 ---
 
-*Built and verified on a real RUVDS server (Debian 13) — every command and
-every trap above comes from an actual deployment, not theory.*
+*Every command above ran on a real server. Every trap above bit us first.*
