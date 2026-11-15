@@ -1,0 +1,21 @@
+# EXAMPLE userdb — copy to userdb.txt and CUSTOMIZE before deploy.
+# WARNING: any password committed to a public repo is burned. These exact
+# entries are public examples — do NOT deploy them as-is.
+#
+# Format: login:x:password   (2nd field ignored by Cowrie)
+# Rules : /regex/ or /regex/i, anchored. '!' prefix = deny.
+# Forbidden: '*' wildcards, empty passwords, top-10 trivia.
+
+root:x:P@ssw0rd2026
+root:x:ServerAdmin1!
+root:x:/^[Rr]oot202[56][!@#]?$/
+
+deploy:x:Deploy2026!
+deploy:x:/^[Dd]eploy123[!@]?$/
+deploy:x:ProdWeb2026
+
+alex:x:Alex2026!
+alex:x:Autumn2026!
+alex:x:/^[Qq]werty2026!?$/
+
+admin:x:Admin@srv04
