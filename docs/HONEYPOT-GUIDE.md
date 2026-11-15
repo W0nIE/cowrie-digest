@@ -29,6 +29,8 @@ attacker "win" — while you watch from a safe distance, popcorn in hand. 🍿
 
 ## 🔥 Fireside chat: Real SSH meets the Honeypot
 
+**Why:** the port swap is the one weird idea in this guide — easiest to "get" as a 20-second dialogue.
+
 *Tonight's discussion: who gets to live on port 22?*
 
 > **Real SSH:** Port 22 is my home. I've always been there.
@@ -371,6 +373,8 @@ instant alerts every 5 minutes.** You never have to look at a log again
 ---
 
 ## 🎉 Done. You built a honeypot.
+
+**Why:** a 10-second recap of what you own now — screenshot it for future you.
 
 Let's take stock. You now have:
 
