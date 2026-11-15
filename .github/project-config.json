@@ -1,0 +1,9 @@
+{
+  "project_number": 2,
+  "project_id": "PVT_kwHOApsrCs4Brrso",
+  "status_field_id": "PVTSSF_lAHOApsrCs4Brrsozhp9Qsw",
+  "statuses": ["New","Analysis","Ready for dev","Dev in Progress","Testing","Review","Done"],
+  "repo": "W0nIE/cowrie-digest",
+  "hermes_zones": ["New", "Ready for dev", "Dev in Progress", "Testing", "Review"],
+  "foreign_zones": ["Analysis", "Done"]
+}
