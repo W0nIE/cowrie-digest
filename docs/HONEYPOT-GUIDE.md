@@ -271,36 +271,5 @@ nano /opt/cowrie/ops/01-digest/config.env
 
 Cron is automatic now: **report 09:00 daily, alerts every 5 min.**
 
----
+🎉 **Done. You built a honeypot.**
 
-## Broke? Trap table 🪤
-
-**Why:** we hit every one of these traps. You skip them.
-
-| Problem | Fix |
-|---|---|
-| Cowrie crashes: `ssh_host_rsa_key.pub` missing | you skipped the folders in step 5 — make them, `chown 999:999` |
-| `PermissionError` in cowrie logs | `chown -R 999:999 /opt/cowrie/var` |
-| Zero logins in log, ever | `userdb.txt` missing → step 5, restart container |
-| Self-attack times out | the `ufw route allow ... 2222` line → step 5 |
-| Died after any `ufw` change | `systemctl restart cowrie.service` (ufw reload breaks it) |
-| `Port` config ignored | Debian 13: port lives in `systemctl edit ssh.socket`, not sshd_config |
-
-## Want more? 🚀
-
-**Why:** basic trap catches dumb bots. Upgrades catch real hackers.
-
-- **Smarter bait:** believable passwords instead of "any" → [07-auth-realism](../07-auth-realism/README.md)
-- **Privacy:** attacker IPs = personal data; reports already pseudonymize them → [docs/PII-PROCESSING.md](PII-PROCESSING.md)
-- **Alerts deep-dive:** [docs/CONFIGURATION.md](CONFIGURATION.md)
-
-## Rules ⚠️
-
-**Why:** the trap invites criminals. Keep them away from everything you value.
-
-- Honeypot = attacked machine. Own VPS. Nothing valuable next to it.
-- Trap passwords ≠ your real passwords. Ever.
-
----
-
-*Every command above ran on a real server. Every trap above bit us first.*
