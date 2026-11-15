@@ -1,120 +1,85 @@
 # cowrie-digest
 
-Daily attack digest + instant alerts for [Cowrie](https://github.com/cowrie/cowrie)
-SSH/Telnet honeypots. Zero dependencies (Python 3 stdlib only), delivers via
-**ntfy.sh** or **Telegram**.
+🍯 Your Cowrie honeypot → 📱 your phone. Daily report at 09:00, instant
+alerts when someone gets in. Pure Python 3 stdlib — zero dependencies.
+Delivers via **ntfy.sh** or **Telegram**.
 
-Part of the `honeypot-ops` module family — self-contained: install, test,
-uninstall without touching anything else on the system.
+> **No honeypot yet?** [docs/HONEYPOT-GUIDE.md](docs/HONEYPOT-GUIDE.md) —
+> from empty VPS to working trap, step by step, caveman-simple.
 
-## What you get
+```mermaid
+flowchart LR
+    C["🍯 Cowrie<br/>cowrie.json"] --> D["digest.py"]
+    D -->|"09:00 daily report"| P["📱 ntfy /<br/>Telegram"]
+    D -->|"every 5 min:<br/>break-in? malware?"| P
 
-- **Daily digest** (cron, 09:00) — connections, unique attacker IPs, failed/successful
-  logins, top credentials tried, top commands executed, malware download URLs,
-  and the list of IPs that got a shell.
-- **Instant alerts** (cron, every 5 min) — one **consolidated** message per run
-  covering new events, so a bot storm can't flood your phone:
-  - `cowrie.login.success` — someone got into the fake shell (count + top creds/IPs)
-  - `cowrie.session.file_download` — malware captured (URL + SHA256)
+    style C fill:#fff8e1,stroke:#f9a825
+    style P fill:#e3f2fd,stroke:#1565c0
+```
 
-  Alert runs scan at most the last 10 MB of the log, so a multi-GB
-  `cowrie.json` never slows the 5-minute cron down.
+## What lands on your phone
 
-Example digest:
+**Why:** watching logs by hand = boring, you'll quit in a week. The phone watches for you.
 
 ```
 🍯 Cowrie digest [srv04] — last 24h
 
 Connections:       312
-Unique IPs:        47
 Failed logins:     1042
 Successful logins: 6
 Commands run:      89
 Files downloaded:  2
 
-Top attacker IPs:
-     58x  103.38.219.22
-     41x  45.148.10.87
-...
+Top attackers:
+     58x  ip-9f4a2c81e7b3
+     41x  ip-2b77c0d4a1f9
 ```
 
-## Requirements
+Plus instant alerts: **someone got a shell** 🚨 or **malware captured** 🦠 —
+one consolidated message per run, so a bot storm can't flood your phone.
 
-- A running Cowrie honeypot with JSON logging enabled (`cowrie.json`)
-- Python 3.8+
-- Root (for cron installation)
+## Install (2 minutes)
 
-## Quick start
+**Why:** honeypot without alerts is a black box. This opens it.
+
+Needs: running Cowrie with `cowrie.json`, Python 3.8+, root.
 
 ```bash
-git clone https://github.com/<you>/cowrie-digest.git
+git clone https://github.com/W0nIE/cowrie-digest.git
 cd cowrie-digest
 sudo ./install.sh
-sudoedit /opt/cowrie/ops/01-digest/config.env   # pick channel + topic/token
-sudo /opt/cowrie/ops/01-digest/digest.py --print   # preview report, sends nothing
-sudo /opt/cowrie/ops/01-digest/digest.py --digest  # send real report now
+sudoedit /opt/cowrie/ops/01-digest/config.env    # pick channel + topic
+sudo /opt/cowrie/ops/01-digest/digest.py --digest  # ✅ phone beeps
 ```
 
-## Configuration
+Channel setup (ntfy = easiest, no account):
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
-All settings live in `/opt/cowrie/ops/01-digest/config.env`
-(created from [`config.env.example`](config.env.example) on install, mode 0600).
+## Config
+
+**Why:** one file, five variables — the whole setup.
+
+One file: `/opt/cowrie/ops/01-digest/config.env` (mode 0600).
 
 | Variable | Meaning |
 |---|---|
 | `CHANNEL` | `ntfy` or `telegram` |
-| `NTFY_TOPIC` | ntfy.sh topic name — make it long and unguessable |
-| `NTFY_SERVER` | ntfy server (default `https://ntfy.sh`, self-hostable) |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | from @BotFather / @userinfobot |
-| `COWRIE_LOG` | path to `cowrie.json` |
-| `DIGEST_HOURS` | hours covered by the daily report (default 24) |
-| `SENSOR_NAME` | label in reports — handy with multiple honeypots |
+| `NTFY_TOPIC` | your secret ntfy topic |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | if Telegram |
+| `SENSOR_NAME` | label in reports (many honeypots? name them) |
+| `DIGEST_HOURS` | report window, default 24 |
 
-See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for step-by-step channel setup.
+## Test / Uninstall
 
-## How it works
-
-```
-/etc/cron.d/cowrie-digest
-├── 0 9 * * *    digest.py --digest   → aggregate last 24h → send report
-└── */5 * * * *  digest.py --alerts   → new success/download events → send alert
-```
-
-`--alerts` keeps a timestamp marker in `state/last_alert.ts`, so every event
-is reported exactly once, even across restarts.
-
-## Testing
+**Why:** test proves it works without a live honeypot. Uninstall leaves zero traces.
 
 ```bash
-./test.sh
-```
-
-Runs the digest against `tests/fixtures/sample_cowrie.jsonl` (a fabricated
-attack log) and asserts every aggregation — no Cowrie, no network needed.
-
-## Uninstall
-
-```bash
-sudo /opt/cowrie/ops/01-digest/uninstall.sh   # or: sudo ./uninstall.sh before deleting
-```
-
-Removes the cron file and the module directory. Cowrie itself and other
-modules are untouched.
-
-## Layout after install
-
-```
-/opt/cowrie/ops/01-digest/
-├── digest.py       # the tool
-├── config.env      # your secrets (0600)
-├── state/          # alert timestamps
-└── log/            # cron output logs
+./test.sh           # offline test on a fake attack log — no Cowrie needed
+sudo ./uninstall.sh # removes cron + module, touches nothing else
 ```
 
 ## License
 
+**Why:** MIT — take it, change it, no asking.
+
 MIT — see [LICENSE](LICENSE).
-
-## Privacy
-
-This project handles attacker IP addresses (personal data under 152-ФЗ/GDPR). Raw logs never leave the server — outbound reports are pseudonymized, VirusTotal receives file hashes (unknown attacker malware samples are uploaded for analysis, never personal data). See [docs/PII-PROCESSING.md](docs/PII-PROCESSING.md) for the plain-language policy and data-flow diagram.
