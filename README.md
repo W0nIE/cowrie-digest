@@ -19,6 +19,8 @@ flowchart LR
 
 ## What lands on your phone
 
+**Why:** watching logs by hand = boring, you'll quit in a week. The phone watches for you.
+
 ```
 🍯 Cowrie digest [srv04] — last 24h
 
@@ -38,6 +40,8 @@ one consolidated message per run, so a bot storm can't flood your phone.
 
 ## Install (2 minutes)
 
+**Why:** honeypot without alerts is a black box. This opens it.
+
 Needs: running Cowrie with `cowrie.json`, Python 3.8+, root.
 
 ```bash
@@ -53,6 +57,8 @@ Channel setup (ntfy = easiest, no account):
 
 ## Config
 
+**Why:** one file, five variables — the whole setup.
+
 One file: `/opt/cowrie/ops/01-digest/config.env` (mode 0600).
 
 | Variable | Meaning |
@@ -65,11 +71,15 @@ One file: `/opt/cowrie/ops/01-digest/config.env` (mode 0600).
 
 ## Test / Uninstall
 
+**Why:** test proves it works without a live honeypot. Uninstall leaves zero traces.
+
 ```bash
 ./test.sh           # offline test on a fake attack log — no Cowrie needed
 sudo ./uninstall.sh # removes cron + module, touches nothing else
 ```
 
 ## License
+
+**Why:** MIT — take it, change it, no asking.
 
 MIT — see [LICENSE](LICENSE).

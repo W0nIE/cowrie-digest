@@ -20,6 +20,8 @@ Port 22 = trap. Trap logs everything.
 
 ## The plan
 
+**Why:** see the whole road before walking it. 8 stops, ~1 hour.
+
 ```mermaid
 flowchart TD
     A["0️⃣ Buy VPS<br/>get IP + root password"] --> B["1️⃣ Login<br/>update system"]
@@ -48,6 +50,8 @@ flowchart TD
 
 ## 1️⃣ Login. Update.
 
+**Why:** holes in old software = free entry for hackers. Fresh system = closed holes.
+
 On your computer:
 
 ```bash
@@ -64,6 +68,8 @@ apt install -y unattended-upgrades sudo
 ---
 
 ## 2️⃣ User. Key. 🔑
+
+**Why:** bots guess passwords in hours. A key can't be guessed. And working as root = one typo kills the server.
 
 Key = unbreakable password. Make key **on your computer**:
 
@@ -94,6 +100,8 @@ Works? Go on. Fails? Fix now, do not continue.
 ---
 
 ## 3️⃣ Move SSH to secret port
+
+**Why:** port 22 must be empty — the trap moves in there. Your real door hides where nobody scans.
 
 **Golden rule: never close working session until new one works.**
 
@@ -146,6 +154,8 @@ ssh -p 51234 -i ~/.ssh/honeypot alex@203.0.113.10        # works ✅
 
 ## 4️⃣ Firewall. fail2ban. 🧱
 
+**Why:** firewall = wall (only 2 doors exist: yours and the trap). fail2ban = guard who bans anyone guessing your door's password.
+
 ```bash
 ufw default deny incoming && ufw default allow outgoing
 ufw allow 51234/tcp comment 'real SSH'
@@ -169,6 +179,8 @@ systemctl restart fail2ban && fail2ban-client status sshd
 ---
 
 ## 5️⃣ Honeypot time 🍯
+
+**Why:** this IS the trap. Fake server in a container — even if hackers "win", they're in a sandbox, not your system.
 
 ```bash
 apt install -y podman fuse-overlayfs slirp4netns
@@ -219,6 +231,8 @@ systemctl restart cowrie.service
 
 ## 6️⃣ Attack yourself 🎣
 
+**Why:** prove the trap works before real hackers arrive. Break it now, not later.
+
 From your computer:
 
 ```bash
@@ -232,6 +246,8 @@ Their attacks: `/opt/cowrie/var/log/cowrie/cowrie.json`.
 ---
 
 ## 7️⃣ Phone beeps 📱
+
+**Why:** reading logs by hand = boring, you'll quit in a week. Phone tells you when something happens.
 
 ```bash
 apt install -y git
@@ -259,6 +275,8 @@ Cron is automatic now: **report 09:00 daily, alerts every 5 min.**
 
 ## Broke? Trap table 🪤
 
+**Why:** we hit every one of these traps. You skip them.
+
 | Problem | Fix |
 |---|---|
 | Cowrie crashes: `ssh_host_rsa_key.pub` missing | you skipped the folders in step 5 — make them, `chown 999:999` |
@@ -270,11 +288,15 @@ Cron is automatic now: **report 09:00 daily, alerts every 5 min.**
 
 ## Want more? 🚀
 
+**Why:** basic trap catches dumb bots. Upgrades catch real hackers.
+
 - **Smarter bait:** believable passwords instead of "any" → [07-auth-realism](../07-auth-realism/README.md)
 - **Privacy:** attacker IPs = personal data; reports already pseudonymize them → [docs/PII-PROCESSING.md](PII-PROCESSING.md)
 - **Alerts deep-dive:** [docs/CONFIGURATION.md](CONFIGURATION.md)
 
 ## Rules ⚠️
+
+**Why:** the trap invites criminals. Keep them away from everything you value.
 
 - Honeypot = attacked machine. Own VPS. Nothing valuable next to it.
 - Trap passwords ≠ your real passwords. Ever.
