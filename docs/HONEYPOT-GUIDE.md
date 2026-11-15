@@ -61,13 +61,6 @@ apt update && apt upgrade -y
 apt install -y unattended-upgrades sudo
 ```
 
-> 🪤 Upgrade fails with `grub-pc` error? Run this, retry:
-> ```bash
-> DISK=$(findmnt -n -o SOURCE / | sed 's/[0-9]*$//')
-> echo "grub-pc grub-pc/install_devices multiselect $DISK" | debconf-set-selections
-> dpkg --configure grub-pc && apt upgrade -y
-> ```
-
 ---
 
 ## 2️⃣ User. Key. 🔑
@@ -274,7 +267,6 @@ Cron is automatic now: **report 09:00 daily, alerts every 5 min.**
 | Self-attack times out | the `ufw route allow ... 2222` line → step 5 |
 | Died after any `ufw` change | `systemctl restart cowrie.service` (ufw reload breaks it) |
 | `Port` config ignored | Debian 13: port lives in `systemctl edit ssh.socket`, not sshd_config |
-| `Permission denied` on secret port | wrong key or user — `-i ~/.ssh/honeypot`, your username, not root |
 
 ## Want more? 🚀
 
@@ -286,7 +278,6 @@ Cron is automatic now: **report 09:00 daily, alerts every 5 min.**
 
 - Honeypot = attacked machine. Own VPS. Nothing valuable next to it.
 - Trap passwords ≠ your real passwords. Ever.
-- Key to the secret port — guard it like a passport.
 
 ---
 
